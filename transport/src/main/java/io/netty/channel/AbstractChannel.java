@@ -534,6 +534,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
         @Override
         public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
+            // 判断是否在 EventLoop 的线程中
             assertEventLoop();
 
             if (!promise.setUncancellable() || !ensureOpen(promise)) {
@@ -553,8 +554,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                         "address (" + localAddress + ") anyway as requested.");
             }
 
+            // 记录 Channel 是否激活
             boolean wasActive = isActive();
             try {
+                // 绑定 Channel 的端口
                 doBind(localAddress);
             } catch (Throwable t) {
                 safeSetFailure(promise, t);
@@ -562,6 +565,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 若 Channel 是新激活的, 触发通知 Channel 已激活的时间
             if (!wasActive && isActive()) {
                 invokeLater(new Runnable() {
                     @Override
@@ -571,6 +575,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 });
             }
 
+            // 回调通知 promise 执行成功
             safeSetSuccess(promise);
         }
 

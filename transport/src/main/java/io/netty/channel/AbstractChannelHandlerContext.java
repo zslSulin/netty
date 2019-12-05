@@ -39,34 +39,56 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         implements ChannelHandlerContext, ResourceLeakHint {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(AbstractChannelHandlerContext.class);
+    /**
+     * 下一个节点
+     */
     volatile AbstractChannelHandlerContext next;
+    /**
+     * 下一个节点
+     */
     volatile AbstractChannelHandlerContext prev;
 
+    /**
+     * {@link #handlerState} 的原子更新器
+     */
     private static final AtomicIntegerFieldUpdater<AbstractChannelHandlerContext> HANDLER_STATE_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AbstractChannelHandlerContext.class, "handlerState");
 
     /**
      * {@link ChannelHandler#handlerAdded(ChannelHandlerContext)} is about to be called.
+     * 添加中
      */
     private static final int ADD_PENDING = 1;
     /**
      * {@link ChannelHandler#handlerAdded(ChannelHandlerContext)} was called.
+     * 已添加
      */
     private static final int ADD_COMPLETE = 2;
     /**
      * {@link ChannelHandler#handlerRemoved(ChannelHandlerContext)} was called.
+     * 已移除
      */
     private static final int REMOVE_COMPLETE = 3;
     /**
      * Neither {@link ChannelHandler#handlerAdded(ChannelHandlerContext)}
      * nor {@link ChannelHandler#handlerRemoved(ChannelHandlerContext)} was called.
+     * 初始化
      */
     private static final int INIT = 0;
 
     private final boolean inbound;
     private final boolean outbound;
+    /**
+     * 所属 匹配率
+     */
     private final DefaultChannelPipeline pipeline;
+    /**
+     * 名字
+     */
     private final String name;
+    /**
+     * 是否使用有序的 EventExecutor({@link #executor}), 即 OrderedEventExecutor
+     */
     private final boolean ordered;
 
     // Will be set to null if no child executor should be used, otherwise it will be set to the
@@ -76,11 +98,17 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
 
     // Lazily instantiated tasks used to trigger events to a handler with different executor.
     // There is no need to make this volatile as at worse it will just create a few more instances then needed.
+    /**
+     * 执行 Channel ReadComplete 事件的任务
+     */
     private Runnable invokeChannelReadCompleteTask;
     private Runnable invokeReadTask;
     private Runnable invokeChannelWritableStateChangedTask;
     private Runnable invokeFlushTask;
 
+    /**
+     * 处理器状态
+     */
     private volatile int handlerState = INIT;
 
     AbstractChannelHandlerContext(DefaultChannelPipeline pipeline, EventExecutor executor, String name,
@@ -208,13 +236,17 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
     }
 
     private void invokeChannelActive() {
+        // 判断是否是符合状态的 ChannelHandler
         if (invokeHandler()) {
             try {
+                // 调用该 ChannelHandler 的 channelActive 方法
                 ((ChannelInboundHandler) handler()).channelActive(this);
             } catch (Throwable t) {
+                // 通知 Inbound 事件的传播, 发生异常
                 notifyHandlerException(t);
             }
         } else {
+            // 跳过, 传播 Inbound 事件给下一个节点
             fireChannelActive();
         }
     }
@@ -496,13 +528,17 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
     }
 
     private void invokeBind(SocketAddress localAddress, ChannelPromise promise) {
+        // 判断是否是符合的 ChannelHandler
         if (invokeHandler()) {
             try {
+                // 调用该 ChannelHandler 的 bind 方法
                 ((ChannelOutboundHandler) handler()).bind(this, localAddress, promise);
             } catch (Throwable t) {
+                // 通知 Outbound 事件的传播, 发生异常
                 notifyOutboundHandlerException(t, promise);
             }
         } else {
+            // 跳过, 传播 Outbound 事件给下一个节点
             bind(localAddress, promise);
         }
     }
@@ -838,6 +874,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
     }
 
     private void notifyHandlerException(Throwable cause) {
+        // 如果是在 ChannelHandler#exceptionCaught(ChannelHandlerContext ctx, Throwable cause) 方法中, 仅打印错误日志. 否则会形成死循环.
         if (inExceptionCaught(cause)) {
             if (logger.isWarnEnabled()) {
                 logger.warn(
@@ -847,6 +884,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
             return;
         }
 
+        // 在 pipeline 中, 传播 ExceptionCaught 事件
         invokeExceptionCaught(cause);
     }
 

@@ -222,6 +222,7 @@ public abstract class AbstractNioChannel extends AbstractChannel {
             // Check first if the key is still valid as it may be canceled as part of the deregistration
             // from the EventLoop
             // See https://github.com/netty/netty/issues/2104
+            // 忽略, 如果 SelectionKey 不合法, 例如已经取消
             if (!key.isValid()) {
                 return;
             }
